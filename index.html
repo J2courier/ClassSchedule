@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Class Schedule — JJ</title>
+  <style>
+    :root{
+      --bg:#0b1020;          /* page background */
+      --card:#151a30;        /* card background */
+      --ink:#eef2ff;         /* primary text */
+      --muted:#a6b0d6;       /* secondary text */
+      --accent:#7c9bff;      /* accents */
+      --accent-2:#59d6c0;    /* secondary accent */
+      --warn:#ffd166;        /* anticipated */
+      --gap:1rem;
+      --radius:1.25rem;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 10% -10%, #19203a 0%, rgba(25,32,58,0) 60%),
+                  radial-gradient(1200px 800px at 110% 10%, #0f152b 0%, rgba(15,21,43,0) 60%),
+                  var(--bg);
+      color:var(--ink);
+      padding:clamp(.75rem,2vw,1.25rem);
+    }
+
+    header{
+      display:flex; align-items:center; gap:1rem; flex-wrap:wrap; justify-content:space-between;
+      margin-bottom:1rem;
+    }
+    .title{font-size:clamp(1.25rem,3vw,1.8rem); font-weight:800; letter-spacing:.3px}
+    .subtitle{color:var(--muted); font-size:.95rem}
+
+    /* Controls */
+    .controls{
+      display:grid; gap:.75rem; grid-template-columns: 1fr; 
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.08);
+      padding:1rem; border-radius:var(--radius); box-shadow:var(--shadow);
+    }
+    @media (min-width: 860px){
+      .controls{grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); align-items:center}
+    }
+
+    .control-group{display:flex; flex-wrap:wrap; gap:.5rem 1rem; align-items:center}
+    .control-label{font-weight:700; font-size:.95rem}
+
+    /* pretty inputs (still pure HTML+CSS) */
+    .chip{position:relative; display:inline-flex; align-items:center; gap:.5rem;}
+    .chip input{appearance:none; width:0; height:0; position:absolute}
+    .chip .vis{
+      display:inline-flex; align-items:center; gap:.5rem; cursor:pointer;
+      background:var(--card); border:1px solid rgba(255,255,255,.08);
+      padding:.5rem .8rem; border-radius:999px; transition:.2s transform, .2s border-color, .2s background;
+      user-select:none; box-shadow:inset 0 -2px 0 rgba(255,255,255,.03);
+      font-weight:600; color:var(--ink); opacity:.9;
+    }
+    .chip .dot{width:.6rem; height:.6rem; border-radius:50%; background:var(--muted); opacity:.8}
+    .chip input:checked + .vis{ border-color: rgba(124,155,255,.6); background: rgba(124,155,255,.12)}
+    .chip input:checked + .vis .dot{ background: var(--accent)}
+
+    /* Layout wrappers for two views */
+    .views{margin-top:1rem}
+    .view{display:none}
+    /* default to time view */
+    #sort-time:checked ~ .views #by-time{display:grid}
+    #sort-day:checked  ~ .views #by-day{display:grid}
+
+    /* Schedules base grid */
+    .schedule{
+      display:grid; gap:var(--gap);
+    }
+    /* Responsive columns */
+    @media (min-width:700px){
+      #by-time{grid-template-columns: repeat(2, minmax(0,1fr));}
+    }
+    @media (min-width:1100px){
+      #by-time{grid-template-columns: repeat(3, minmax(0,1fr));}
+    }
+
+    /* By-day grid: 1col mobile → 5col desktop */
+    #by-day{grid-template-columns:1fr}
+    @media (min-width:900px){
+      #by-day{grid-template-columns: repeat(5, minmax(0,1fr)); align-items:start}
+    }
+
+    .day-column{display:grid; gap:var(--gap)}
+    .day-heading{font-weight:800; letter-spacing:.3px; color:var(--accent-2); padding-left:.2rem}
+    .muted{color:var(--muted)}
+
+    /* Cards */
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:var(--radius); padding:1rem; display:flex; flex-direction:column; gap:.6rem;
+      box-shadow:var(--shadow);
+      order: var(--order-time); /* Used in the By TIME view */
+    }
+    .line1{display:flex; justify-content:space-between; gap:.75rem; align-items:center}
+    .time{font-weight:900; font-size:1rem; letter-spacing:.2px}
+    .day{font-weight:700; color:var(--muted)}
+    .course{font-weight:800; font-size:1.05rem}
+    .instructor{color:var(--muted)}
+    .badge{display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .5rem; border-radius:999px; font-size:.8rem; border:1px solid rgba(255,255,255,.08)}
+    .anticipated{background:rgba(255,209,102,.12); color:#ffe29a; border-color: rgba(255,209,102,.6)}
+
+    /* Filtering (pure CSS) */
+    /* If ANY day checkbox is checked → hide all cards */
+    input[type=checkbox]:checked ~ .views .card{ display:none }
+    /* Then show selected days back */
+    #mon:checked ~ .views [data-day="Mon"]{ display:flex }
+    #tue:checked ~ .views [data-day="Tue"]{ display:flex }
+    #wed:checked ~ .views [data-day="Wed"]{ display:flex }
+    #thu:checked ~ .views [data-day="Thu"]{ display:flex }
+    #fri:checked ~ .views [data-day="Fri"]{ display:flex }
+
+    /* Day-sorted column placement (no JS) */
+    /* Each day gets its own column section in #by-day */
+
+    /* Nice focus states */
+    .chip .vis:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+    /* Legend */
+    .legend{display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; font-size:.9rem}
+    .dot-legend{width:.6rem; height:.6rem; border-radius:50%; background:var(--accent)}
+
+    /* Footer */
+    footer{margin-top:1.25rem; color:var(--muted); font-size:.85rem}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="title">📚 JJ — Class Schedule</div>
+      <!-- <div class="subtitle">HTML + CSS only · Filter by day · Toggle sort: by time or by day</div> -->
+    </div>
+  </header>
+
+  <section class="controls" aria-label="Controls">
+    <div class="control-group" role="group" aria-label="Sort">
+      <div class="control-label">Sort</div>
+      <!-- Sort radios: default is Time -->
+      <label class="chip">
+        <input type="radio" id="sort-time" name="sort" checked />
+        <span class="vis"><span class="dot"></span>By Time (chronological)</span>
+      </label>
+      <label class="chip">
+        <input type="radio" id="sort-day" name="sort" />
+        <span class="vis"><span class="dot"></span>By Day</span>
+      </label>
+    </div>
+
+    <div class="control-group" role="group" aria-label="Filter days">
+      <div class="control-label">Filter Days</div>
+      <label class="chip">
+        <input type="checkbox" id="mon" />
+        <span class="vis"><span class="dot"></span>Mon</span>
+      </label>
+      <label class="chip">
+        <input type="checkbox" id="tue" />
+        <span class="vis"><span class="dot"></span>Tue</span>
+      </label>
+      <label class="chip">
+        <input type="checkbox" id="wed" />
+        <span class="vis"><span class="dot"></span>Wed</span>
+      </label>
+      <label class="chip">
+        <input type="checkbox" id="thu" />
+        <span class="vis"><span class="dot"></span>Thu</span>
+      </label>
+      <label class="chip">
+        <input type="checkbox" id="fri" />
+        <span class="vis"><span class="dot"></span>Fri</span>
+      </label>
+      <div class="legend" aria-hidden="true">
+        <span class="dot-legend"></span><span class="muted">Select one or more days to filter. Clear all to show everything.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="views">
+    <!-- ===================== VIEW: BY TIME (one big grid, ordered chronologically) ===================== -->
+    <div id="by-time" class="view schedule" aria-label="Schedule sorted by time">
+      <!-- MONDAY -->
+      <article class="card" data-day="Mon" style="--order-time:11300">
+        <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Mon</span></div>
+        <div class="course">Stat 311: Basic Statistics</div>
+        <div class="instructor">Prof. Mendoza</div>
+      </article>
+      <article class="card" data-day="Mon" style="--order-time:11400">
+        <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Mon</span></div>
+        <div class="course">CS Elective 101: Intelligent Systems</div>
+        <div class="instructor">Ms. Begas</div>
+      </article>
+
+      <!-- TUESDAY -->
+      <article class="card" data-day="Tue" style="--order-time:20800">
+        <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Tue</span></div>
+        <div class="course">CS 112: Algorithms and Complexity</div>
+        <div class="instructor">Prof. Charles B. Almonquera, Jr.</div>
+      </article>
+      <article class="card" data-day="Tue" style="--order-time:21300">
+        <div class="line1"><span class="time">1:00 PM – 2:30 PM</span><span class="day">Tue</span></div>
+        <div class="course">CS 115: Logic Design and Digital Computer Circuit</div>
+        <div class="instructor">Engr. Rio L. Vergabera</div>
+      </article>
+      <article class="card" data-day="Tue" style="--order-time:21430">
+        <div class="line1"><span class="time">2:30 PM – 4:00 PM</span><span class="day">Tue</span></div>
+        <div class="course">CS 113: Discrete Structures 2</div>
+        <div class="instructor">Engr. Zandro A. Amanguiton</div>
+      </article>
+      <article class="card" data-day="Tue" style="--order-time:21600">
+        <div class="line1"><span class="time">4:00 PM – 5:00 PM</span><span class="day">Tue</span></div>
+        <div class="course">CS Elective 101: Intelligent Systems</div>
+        <div class="instructor">Ms. Begas</div>
+      </article>
+
+      <!-- WEDNESDAY -->
+      <article class="card" data-day="Wed" style="--order-time:31300">
+        <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Wed</span></div>
+        <div class="course">Stat 311: Basic Statistics</div>
+        <div class="instructor">Prof. Mendoza</div>
+      </article>
+      <article class="card" data-day="Wed" style="--order-time:31400">
+        <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Wed</span></div>
+        <div class="course">CS 114: Networks and Communications</div>
+        <div class="instructor">Ms. Begas</div>
+        <div class="badge anticipated">ANTICIPATED CLASS</div>
+      </article>
+
+      <!-- THURSDAY -->
+      <article class="card" data-day="Thu" style="--order-time:41300">
+        <div class="line1"><span class="time">1:00 PM – 2:30 PM</span><span class="day">Thu</span></div>
+        <div class="course">CS 115: Logic Design and Digital Computer Circuit</div>
+        <div class="instructor">Engr. Rio L. Vergabera</div>
+      </article>
+      <article class="card" data-day="Thu" style="--order-time:41430">
+        <div class="line1"><span class="time">2:30 PM – 4:00 PM</span><span class="day">Thu</span></div>
+        <div class="course">CS 113: Discrete Structures 2</div>
+        <div class="instructor">Engr. Zandro A. Amanguiton</div>
+      </article>
+      <article class="card" data-day="Thu" style="--order-time:41600">
+        <div class="line1"><span class="time">4:00 PM – 5:00 PM</span><span class="day">Thu</span></div>
+        <div class="course">CS Elective 101: Intelligent Systems</div>
+        <div class="instructor">Ms. Begas</div>
+      </article>
+
+      <!-- FRIDAY -->
+      <article class="card" data-day="Fri" style="--order-time:50800">
+        <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Fri</span></div>
+        <div class="course">Free Elective 101: Technical Writing</div>
+        <div class="instructor">Mr. Kim B. Bartolo</div>
+      </article>
+      <article class="card" data-day="Fri" style="--order-time:50801">
+        <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Fri</span></div>
+        <div class="course">CS 112: Algorithms and Complexity</div>
+        <div class="instructor">Prof. Charles B. Almonquera, Jr.</div>
+        <div class="badge anticipated">ANTICIPATED CLASS</div>
+      </article>
+      <article class="card" data-day="Fri" style="--order-time:51300">
+        <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Fri</span></div>
+        <div class="course">Stat 311: Basic Statistics</div>
+        <div class="instructor">Prof. Mendoza</div>
+      </article>
+      <article class="card" data-day="Fri" style="--order-time:51400">
+        <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Fri</span></div>
+        <div class="course">CS 114: Networks and Communications</div>
+        <div class="instructor">Ms. Begas</div>
+      </article>
+    </div>
+
+    <!-- ===================== VIEW: BY DAY (5 columns on desktop) ===================== -->
+    <div id="by-day" class="view" aria-label="Schedule grouped by day">
+      <div class="day-column">
+        <div class="day-heading">Mon</div>
+        <article class="card" data-day="Mon">
+          <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Mon</span></div>
+          <div class="course">Stat 311: Basic Statistics</div>
+          <div class="instructor">Prof. Mendoza</div>
+        </article>
+        <article class="card" data-day="Mon">
+          <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Mon</span></div>
+          <div class="course">CS Elective 101: Intelligent Systems</div>
+          <div class="instructor">Ms. Begas</div>
+        </article>
+      </div>
+
+      <div class="day-column">
+        <div class="day-heading">Tue</div>
+        <article class="card" data-day="Tue">
+          <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Tue</span></div>
+          <div class="course">CS 112: Algorithms and Complexity</div>
+          <div class="instructor">Prof. Charles B. Almonquera, Jr.</div>
+        </article>
+        <article class="card" data-day="Tue">
+          <div class="line1"><span class="time">1:00 PM – 2:30 PM</span><span class="day">Tue</span></div>
+          <div class="course">CS 115: Logic Design and Digital Computer Circuit</div>
+          <div class="instructor">Engr. Rio L. Vergabera</div>
+        </article>
+        <article class="card" data-day="Tue">
+          <div class="line1"><span class="time">2:30 PM – 4:00 PM</span><span class="day">Tue</span></div>
+          <div class="course">CS 113: Discrete Structures 2</div>
+          <div class="instructor">Engr. Zandro A. Amanguiton</div>
+        </article>
+        <article class="card" data-day="Tue">
+          <div class="line1"><span class="time">4:00 PM – 5:00 PM</span><span class="day">Tue</span></div>
+          <div class="course">CS Elective 101: Intelligent Systems</div>
+          <div class="instructor">Ms. Begas</div>
+        </article>
+      </div>
+
+      <div class="day-column">
+        <div class="day-heading">Wed</div>
+        <article class="card" data-day="Wed">
+          <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Wed</span></div>
+          <div class="course">Stat 311: Basic Statistics</div>
+          <div class="instructor">Prof. Mendoza</div>
+        </article>
+        <article class="card" data-day="Wed">
+          <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Wed</span></div>
+          <div class="course">CS 114: Networks and Communications</div>
+          <div class="instructor">Ms. Begas</div>
+          <div class="badge anticipated">ANTICIPATED CLASS</div>
+        </article>
+      </div>
+
+      <div class="day-column">
+        <div class="day-heading">Thu</div>
+        <article class="card" data-day="Thu">
+          <div class="line1"><span class="time">1:00 PM – 2:30 PM</span><span class="day">Thu</span></div>
+          <div class="course">CS 115: Logic Design and Digital Computer Circuit</div>
+          <div class="instructor">Engr. Rio L. Vergabera</div>
+        </article>
+        <article class="card" data-day="Thu">
+          <div class="line1"><span class="time">2:30 PM – 4:00 PM</span><span class="day">Thu</span></div>
+          <div class="course">CS 113: Discrete Structures 2</div>
+          <div class="instructor">Engr. Zandro A. Amanguiton</div>
+        </article>
+        <article class="card" data-day="Thu">
+          <div class="line1"><span class="time">4:00 PM – 5:00 PM</span><span class="day">Thu</span></div>
+          <div class="course">CS Elective 101: Intelligent Systems</div>
+          <div class="instructor">Ms. Begas</div>
+        </article>
+      </div>
+
+      <div class="day-column">
+        <div class="day-heading">Fri</div>
+        <article class="card" data-day="Fri">
+          <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Fri</span></div>
+          <div class="course">Free Elective 101: Technical Writing</div>
+          <div class="instructor">Mr. Kim B. Bartolo</div>
+        </article>
+        <article class="card" data-day="Fri">
+          <div class="line1"><span class="time">8:00 AM – 11:00 AM</span><span class="day">Fri</span></div>
+          <div class="course">CS 112: Algorithms and Complexity</div>
+          <div class="instructor">Prof. Charles B. Almonquera, Jr.</div>
+          <div class="badge anticipated">ANTICIPATED CLASS</div>
+        </article>
+        <article class="card" data-day="Fri">
+          <div class="line1"><span class="time">1:00 PM – 2:00 PM</span><span class="day">Fri</span></div>
+          <div class="course">Stat 311: Basic Statistics</div>
+          <div class="instructor">Prof. Mendoza</div>
+        </article>
+        <article class="card" data-day="Fri">
+          <div class="line1"><span class="time">2:00 PM – 5:00 PM</span><span class="day">Fri</span></div>
+          <div class="course">CS 114: Networks and Communications</div>
+          <div class="instructor">Ms. Begas</div>
+        </article>
+      </div>
+    </div>
+  </section>
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Elements
+  const sortTime = document.getElementById('sort-time');
+  const sortDay = document.getElementById('sort-day');
+  const byTime = document.getElementById('by-time');
+  const byDay = document.getElementById('by-day');
+  const dayCheckboxes = ['mon','tue','wed','thu','fri'].map(id => document.getElementById(id));
+  const allCards = document.querySelectorAll('.card');
+
+  // Sorting
+  function updateSortView() {
+    if (sortTime.checked) {
+      byTime.style.display = 'grid';
+      byDay.style.display = 'none';
+    } else {
+      byTime.style.display = 'none';
+      byDay.style.display = 'grid';
+    }
+  }
+  sortTime.addEventListener('change', updateSortView);
+  sortDay.addEventListener('change', updateSortView);
+  updateSortView();
+
+  // Filtering
+  function updateFilter() {
+    // Get checked days
+    const checkedDays = dayCheckboxes.filter(cb => cb.checked).map(cb => cb.id.charAt(0).toUpperCase() + cb.id.slice(1));
+    if (checkedDays.length === 0) {
+      allCards.forEach(card => card.style.display = card.parentElement.classList.contains('day-column') ? 'flex' : 'flex');
+    } else {
+      allCards.forEach(card => {
+        const day = card.getAttribute('data-day');
+        card.style.display = checkedDays.includes(day) ? 'flex' : 'none';
+      });
+    }
+  }
+  dayCheckboxes.forEach(cb => cb.addEventListener('change', updateFilter));
+  updateFilter();
+});
+</script>
+</body>
+</html>
